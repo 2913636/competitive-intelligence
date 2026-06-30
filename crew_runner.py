@@ -11,6 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process, LLM
 from tools.web_search import WebSearchTool
+from tools.web_scraper import WebScraperTool
 
 load_dotenv()
 
@@ -18,7 +19,7 @@ load_dotenv()
 deepseek_llm = LLM(
     model="deepseek/deepseek-chat",
     api_key=os.getenv("DEEPSEEK_KEY"),
-    base_url="https://api.deepseek.com/v1",
+    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
     temperature=0.3,
 )
 
@@ -27,6 +28,7 @@ deepseek_llm = LLM(
 def _create_agents():
     """每次分析创建全新的 Agent 实例，避免 CrewAI 并发冲突"""
     web_search_tool = WebSearchTool()
+    web_scraper_tool = WebScraperTool()
 
     researcher = Agent(
         role="资深市场情报研究员",
@@ -35,8 +37,9 @@ def _create_agents():
             "你有10年市场调研经验，擅长从网络公开信息中挖掘有价值的情报。"
             "你从不依赖记忆，每次都必须使用 web_search 工具去搜索最新信息。"
             "你会从公司基础信息、产品定价、用户评价、行业地位、最新动态5个维度全面搜索。"
+            "搜索结果中如果有重要的链接，使用 web_scraper 工具抓取完整页面内容进行分析。"
         ),
-        tools=[web_search_tool],
+        tools=[web_search_tool, web_scraper_tool],
         llm=deepseek_llm,
         verbose=True,
     )
@@ -82,6 +85,8 @@ def create_research_task(company: str, researcher: Agent) -> Task:
             f"4. 行业地位：搜索「{company} 市场份额 竞品 行业排名」\n"
             f"5. 最新动态：搜索「{company} 最新 新闻 2025 2026」\n\n"
             f"重要：必须使用 web_search 工具执行每一次搜索，不要跳过任何维度。\n"
+            f"对于搜索结果中的高价值链接（公司官网、产品页面、新闻稿），"
+            f"必须使用 web_scraper 工具抓取完整页面内容，获取比摘要更详细的信息。\n"
             f"把所有搜索结果整理成结构化的信息，为后续分析提供原材料。"
         ),
         expected_output=(

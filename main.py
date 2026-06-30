@@ -116,6 +116,8 @@ with col2:
 # ====== 执行分析 ======
 if "running" not in st.session_state:
     st.session_state["running"] = False
+if "last_result" not in st.session_state:
+    st.session_state["last_result"] = None
 
 if run_button and not st.session_state["running"]:
     company = company_input.strip() if company_input else ""
@@ -139,29 +141,35 @@ if run_button and not st.session_state["running"]:
                     "filepath": filepath
                 })
 
-                # 显示报告
-                st.markdown("---")
-                st.markdown("### 📄 竞品分析报告")
-
-                with st.container():
-                    st.markdown(result["report"])
-
-                # 下载按钮
-                st.download_button(
-                    label="⬇ 下载 Markdown 报告",
-                    data=result["report"],
-                    file_name=f"{company}_竞品分析报告_{datetime.now().strftime('%Y%m%d')}.md",
-                    mime="text/markdown",
-                    type="primary",
-                )
+                # 持久化到 session_state，确保页面刷新后报告不会消失
+                st.session_state["last_result"] = result
 
             else:
                 status.update(label=f"❌ 分析失败", state="error", expanded=True)
                 st.error(f"错误信息：{result['error']}")
                 st.info("💡 可能的原因：\n- 网络连接问题\n- API Key 配置异常\n- 搜索服务暂时不可用\n\n请检查后重试。")
+                st.session_state["last_result"] = None
 
             # 重置运行状态，允许下次分析
             st.session_state["running"] = False
+
+# 显示上次分析结果（持久化在 session_state 中，跨 rerun 不丢失）
+if st.session_state["last_result"]:
+    result = st.session_state["last_result"]
+    st.markdown("---")
+    st.markdown("### 📄 竞品分析报告")
+
+    with st.container():
+        st.markdown(result["report"])
+
+    # 下载按钮
+    st.download_button(
+        label="⬇ 下载 Markdown 报告",
+        data=result["report"],
+        file_name=f"{result['company']}_竞品分析报告_{datetime.now().strftime('%Y%m%d')}.md",
+        mime="text/markdown",
+        type="primary",
+    )
 
 # ====== 底部信息 ======
 st.markdown("---")
